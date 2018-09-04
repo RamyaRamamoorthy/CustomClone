@@ -1,0 +1,249 @@
+/*
+Class name: CloneDynamicPage
+Referenced in vf page: CloneDynamicPage
+Purpose: Takes the record ID as a parameter and clones.
+*/
+Public with sharing class CloneDynamicPage
+{
+public sObject newemp {get;set;}
+transient public Component.Apex.PageBlockTable table {get;set;}  
+transient public Component.Apex.PageBlock pb{get;set;} 
+//Get Comma-separated Api-names of fields found on a pagelayout
+public string rectypefld {get;set;}
+public string dynamicSQL{get; set;}
+//Get SObject Selected if any
+public string objectselected {get;set;}
+public string accountselected{get; set;}
+public Id recordId{get;set;}
+public list<Account> accLst {get; set;} 
+public list<Sobject> sobjLst {get; set;} 
+//list of fields with values
+public Map<String, List<String>> sectionObjListMap { get; set;}
+private List<CloneGeneric__mdt> clolist = new List<CloneGeneric__mdt>();
+public Double askamt {get;set;}
+public id accid {get;set;}
+public Boolean showclose {get;set;}    
+
+public CloneDynamicPage()
+{
+    //Initializing Variables
+    id tempid=ApexPages.currentPage().getParameters().get('id');
+    accid = ApexPages.currentPage().getParameters().get('accid');
+    recordId = tempid;
+    objectselected = tempid.getSObjectType().getDescribe().getName();
+    showclose = true;
+  if (objectselected == 'Opportunity')
+        showclose = false;
+    clolist = [select Field__c, Value__c FROM CloneGeneric__mdt where Object__c =:objectselected ];       
+    sectionObjListMap = new Map<String, List<String>>(); // storing fields for each section
+}
+ 
+//method called on onload of page to showdata fields with data dynamically
+public void calledonload()
+{
+    Map <String, Schema.SObjectField> fNameMap1 = Schema.getGlobalDescribe().get(objectselected).getDescribe().fields.getMap();
+    Map<String, String> displayFieldMap = new Map<String, String>();
+    Map<String, String> displayLabelMap = new Map<String, String>();
+    String dynamicSQL='SELECT id ';  
+    List<String> reqfldlist=new List<String>();
+    List<String> sectionItemList =  new List<String>();
+    List<String> sectionList = new List<String>(); 
+    List<String> displayFieldLst;
+    System.debug('objectselected:'+objectselected);
+    System.debug('rectypefld---->'+rectypefld); 
+    if (objectselected != 'Opportunity' && objectselected != 'Payment__c')
+      rectypefld = rectypefld.replaceFirst(',', ',Name,');
+    
+    //Name field is not automatically available in Dynamic loading.
+    //Examples of how you want to add Name field in the page layout , if your Name field is not the first field in pagelayout
+    if(objectselected == 'Opportunity')
+        rectypefld = rectypefld.replaceFirst(',StageName', ',Name,stagename');
+    if(objectselected == 'Payment__c')
+        rectypefld = rectypefld.replaceFirst(',Payment_GL_Post_Date__c', ',Name,Payment_GL_Post_Date__c');
+    
+    System.debug('rectypefld---->'+rectypefld); 
+    List<string> reqfldlist_temp=rectypefld.split('%sr%');
+    System.debug('Size---->'+reqfldlist_temp.size());
+    if(reqfldlist_temp.size()!=1) // required field list
+        reqfldlist=reqfldlist_temp[1].split(',');
+     //Examples of how you want to make Name field as Required in the page layout
+    if (objectselected != 'Payment__c') 
+      reqfldlist.add('Name');
+    System.debug('reqfld is ' + reqfldlist);
+// section Item list
+    if(reqfldlist_temp[0] != '' || reqfldlist_temp[0] != null)
+    {
+        sectionItemList = reqfldlist_temp[0].split(':');
+    }
+    displayFieldLst = new List<String>();
+        
+    if(sectionItemList.size()>0)
+    for(string sections : sectionItemList)
+    {
+        list<string> rlist=new list<string>();
+        displayFieldLst = new List<String>();
+        rlist=sections.split(',');
+    
+        String sectionName = rlist[0].split('#')[1];
+        // get unique list of section items
+        if(sectionObjListMap.get(sectionName)!=null)
+        {
+          displayFieldLst = sectionObjListMap.get(sectionName);
+        }
+        else
+        {
+         sectionList.add(sectionName); // get the section List in order
+        }
+    // iterate through each of the section item
+        for (Integer i=1; i<rlist.size(); i++)
+        {
+        string r1 = rlist[i];
+        if(r1!='' && r1!=null)
+        {
+            String pcName = r1;
+            System.debug('Printing--->'+pcName);
+            if(pcName != 'null' && fNameMap1.get(pcName)!=null)
+            {
+            System.debug('Printing again--->'+pcName);
+            Schema.DescribeFieldResult s = fNameMap1.get(pcName).getDescribe();
+            Schema.DisplayType st = s.getType();  
+            displayLabelMap.put(pcName,s.getLabel());
+                if(pcName == 'RecordTypeId')
+                {
+                String lkapi =pcName.substring(0,pcName.length()-2)+'.Name';
+                dynamicSQL+= ', ' + pcName+ ',' + lkapi; 
+                displayFieldLst.add(pcName);
+                displayFieldMap.put(pcName, lkapi);                     
+                }        
+                else
+                {
+                    if (!s.isCalculated()) {
+                        dynamicSQL+=', ' + pcName; 
+                        displayFieldMap.put(pcName,pcName);
+                        displayFieldLst.add(pcName);
+                    }
+                }
+            }
+        } // end of outer if
+     } // end of inner for
+    sectionObjListMap.put(sectionName, displayFieldLst); // store section name and respective fields
+} // end of main for loop
+    
+    dynamicSQL+=' FROM '+objectselected +' where Id=:recordId';  
+    //System.debug('objectfieldlist2: '+ objectfieldlist2.size());
+    System.debug('sectionList'+ sectionList.size() + sectionList);
+    sobjLst=Database.query(dynamicSQL); 
+    
+    overwrite();
+
+  if(sobjLst.size() >0)
+    {         
+      table = new Component.Apex.PageBlockTable(var='rec');  
+      table.expressions.value='{!sobjLst}';  
+      pb = new Component.Apex.PageBlock(tabStyle=objectselected);   
+      //add the field  
+      Component.Apex.OutputLabel label;
+      Component.Apex.outputLink link = new Component.Apex.outputLink();
+      Component.Apex.outputText txt = new Component.Apex.outputText(); 
+      Component.Apex.PageblockSectionItem pbsecItem = new Component.Apex.PageblockSectionItem(); 
+      Component.Apex.inputField inputField;
+      Component.Apex.outputField outputField;
+      Component.Apex.PageblockSection pbsection;// = new Component.Apex.PageblockSection(columns=2, title=sectionList[0]);
+      Map <String, Schema.SObjectField> fNameMap2 = Schema.getGlobalDescribe().get(objectselected).getDescribe().fields.getMap();
+      Boolean isoutputLink = false;
+ 
+        for(Integer j=0; j<sectionList.size(); j++)
+        {    
+        Boolean ispbSectionCreated = false;
+        Boolean isBlankField = true;
+        Boolean isOutputField = false;
+     // pbsection = new Component.Apex.PageblockSection(columns=2, title=sectionList[j]); 
+        displayFieldLst = sectionObjListMap.get(sectionList[j]);  
+      //System.debug('<<<>>>>'+sectionList[j]);
+      
+      for(Integer index=0;index<displayFieldLst.size();index++)  
+      { 
+        System.debug('display is ' + displayFieldMap.get(displayFieldLst.get(index)));
+        Schema.DescribeFieldResult s2 = fNameMap2.get(displayFieldLst.get(index)).getDescribe();
+        if (displayFieldMap.get(displayFieldLst.get(index)) == 'RecordType.Name') {
+            outputField= new Component.Apex.outputField();
+            outputField.expressions.value = '{!sobjLst[0].' + displayFieldMap.get(displayFieldLst.get(index)) + '}';
+            outputField.label=displayLabelMap.get(displayFieldLst.get(index));
+            isOutputField = true;
+        }
+        else {
+            inputField= new Component.Apex.inputField();
+            inputField.expressions.value = '{!sobjLst[0].' + displayFieldMap.get(displayFieldLst.get(index)) + '}';
+            inputField.label=displayLabelMap.get(displayFieldLst.get(index));
+            if (reqfldlist.contains(displayFieldLst.get(index)))
+                inputField.required = true;
+        }
+        if(!ispbSectionCreated)
+          {
+            pbsection = new Component.Apex.PageblockSection(columns=2, title=sectionList[j]); 
+            ispbSectionCreated = true;
+            pb.childcomponents.add(pbsection);
+            pbsection.childcomponents.add(inputField);
+            if(isoutputLink) { pbsection.childcomponents.add(pbsecItem); isoutputLink = false; }
+          } 
+          else 
+          {
+            pb.childcomponents.add(pbsection);
+            if (isOutputField) {
+                pbsection.childcomponents.add(outputField);
+                isOutputField = false;
+            }
+            else 
+              pbsection.childcomponents.add(inputField);
+            if(isoutputLink) { pbsection.childcomponents.add(pbsecItem);  isoutputLink = false; }
+          }
+      }  // end of inner for - Interation through fields with in section
+    } // end of outer for - iteration through sections
+} 
+    else // if there are no records found for any given ID in the URL
+{
+ pb = new Component.Apex.PageBlock(tabStyle=objectselected); 
+ Component.Apex.outputLabel lbl = new Component.Apex.outputLabel(value='Sorry.. No record exists, Please try another record!');
+ pb.childcomponents.add(lbl);
+ }
+ 
+} // ends method here
+ 
+public PageReference saveNew() {
+    System.debug('Iam in savenew');
+    newemp = sobjLst[0].clone(false);
+    try { 
+     insert newemp; 
+    } catch(System.DMLException e) {
+        System.debug('exception is ' + e.getMessage());
+        ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,e.getMessage()));
+        return null;
+    }   
+
+    return (new PageReference('/' + newemp.Id));        
+
+}  
+
+public PageReference close() {
+    System.debug('in close');
+    return (new PageReference ('/' + sobjLst[0].Id));
+}
+
+
+//For overwriting values in Custom metadata Types or handling custom paramters we pass on to this VF Page
+public void overwrite() {
+    for (CloneGeneric__mdt c : clolist) {
+        System.debug('so fieldname is ' + sobjLst[0]);
+        //If you have Boolean values in your custom metadata type, but store it as String variable in custom metadata type
+        if (c.Value__c == 'false') {
+            System.debug('so i am inside false -- fieldname is ' + sobjLst[0]);
+            sobjLst[0].put(c.Field__c, false);
+        }
+        else 
+          sobjLst[0].put(c.Field__c, c.Value__c);        
+    }   
+
+    if (accid != null)
+        sobjLst[0].put('AccountId',accid);    
+}
+}

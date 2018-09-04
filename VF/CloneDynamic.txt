@@ -1,0 +1,120 @@
+<apex:page Controller="CloneDynamicPage"  sidebar="false" id="pageid" standardStylesheets="true" showHeader="true" lightningStylesheets="true">
+    <apex:outputPanel id="msgPanel">
+    <apex:pageMessages />
+    </apex:outputPanel>
+<script type="text/javascript">
+var __sfdcSessionId = '{!GETSESSIONID()}';
+</script>
+<script src="../../soap/ajax/29.0/connection.js" type="text/javascript"></script>
+<script type="text/javascript">
+var apinames_req='';  // this will contain fields which are visible as required on pagelayout
+var apinames = '';   // this will contain fields visible on pagelayout
+//Getting Fields Apiname on the basis of Pagelayout(using RecordType)
+function detailLayoutResults(result,Layoutname)
+{
+    var allTheLayouts = result.getArray("layouts");     //adding fields and sections
+    var firsttime = false;
+    for (var i = 0; i < allTheLayouts.length; i++)
+    {
+        var layout = allTheLayouts[i];
+        var elSections = layout.getArray(Layoutname);
+        for (var j = 0; j < elSections.length; j++)
+        {
+            var els = elSections[j];
+            apinames+='SectionName#'+els.heading+',';//+',TotalColumns:'+els.columns+',';
+            console.log('in the start ' + apinames);
+
+            var allTheLayoutRows = els.getArray("layoutRows");
+            for (var k = 0; k < allTheLayoutRows.length; k++)
+                {
+                    var lr = allTheLayoutRows[k];
+                    var lis = lr.getArray("layoutItems");
+                    for (var h = 0; h < lis.length; h++)
+                    {
+                    var li = lis[h];
+                    if (li.layoutComponents != null && li.layoutComponents.length == 2)     //only in case of Lead and Contact First Name, which includes Salutation also
+                    {
+                        if(apinames.indexOf(li.layoutComponents[1].value)=='-1')
+                        {
+                        apinames+= li.layoutComponents[1].value + ',';
+                        }
+                        if(apinames_req.indexOf(li.layoutComponents[1].value)=='-1')
+                        {
+                        if(li.required==true || li.required=='true')
+                        apinames_req+=li.layoutComponents[1].value +',';
+                        }
+                    }
+                    else if (li.layoutComponents != null)           //for all other fields
+                    {
+                        if(apinames.indexOf(li.layoutComponents.value)=='-1')
+                        {
+                        if(li.required==true || li.required=='true')
+                        apinames_req+=li.layoutComponents.value +',';
+                        apinames+= li.layoutComponents.value + ',';
+                        }
+                    }
+                }
+            }
+            apinames+=':';
+        }
+    }
+}
+//Produce Fields on pagelayout using detailLayoutResults Method
+function getfieldsonpagelayout()
+{
+    try
+    {
+        var objectname='{!JSENCODE(objectselected)}';
+        var tempquery="Select RecordTypeId From "+objectname+" where id= '{!$CurrentPage.parameters.id}'";
+        var resultdesc = sforce.connection.query(tempquery);
+        var recordsdesc = resultdesc.getArray("records");
+        var RecordTypeId = recordsdesc[0].get('RecordTypeId');
+        var result;
+        if (RecordTypeId != '' && RecordTypeId != null)
+        result = sforce.connection.describeLayout(objectname, new Array(RecordTypeId));
+        
+        detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
+        detailLayoutResults(result,'detailLayoutSections');        // getting fields from Detaillayout
+        apinames+='%sr%'+apinames_req;
+        apinames=apinames.replace(',undefined','').replace('undefined,','');
+        console.log('apinames is ' + apinames);
+        calledonload(apinames);
+    }
+    catch (error)
+    {
+        var  result = sforce.connection.describeLayout(objectname);
+        detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
+        detailLayoutResults(result,'detailLayoutSections');        // getting fields from Detaillayout
+        apinames+='%sr%'+apinames_req;
+        apinames=apinames.replace(',undefined','').replace('undefined,','');
+        calledonload(apinames);                                         // called  on onload,give fields
+    }
+}
+</script>
+<apex:form id="frmid">
+    <apex:actionFunction name="calledonload" action="{!calledonload}"  rerender="mainpanel" status="mystatus">
+    <apex:param name="param1" assignTo="{!rectypefld}" value=""/>
+    </apex:actionFunction>
+    
+    <apex:outputpanel id="buttonpanel" 	>
+        <div align="center" draggable="false" >
+        <apex:commandButton value="Save" action="{!saveNew}" rerender="msgPanel"/>
+        <apex:commandButton value="Cancel" action="{!close}" rendered="{!showclose}"/>
+        </div>
+    </apex:outputpanel>
+
+    <apex:actionStatus id="mystatus" startText="Loading... please wait..." stopText="" style="left: 100px;top: 50px;">
+        <apex:facet name="start">&nbsp;&nbsp;Loading... please wait...
+        <img src="/apexpages/devmode/img/saveStatus.gif" />
+        </apex:facet>
+    </apex:actionStatus>
+
+    <apex:outputPanel id="mainpanel">
+        <apex:dynamicComponent componentValue="{!pb}"/>   
+    </apex:outputPanel> 
+</apex:form>
+
+<script>
+    getfieldsonpagelayout();
+</script>
+</apex:page>
