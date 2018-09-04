@@ -9,7 +9,7 @@ var __sfdcSessionId = '{!GETSESSIONID()}';
 <script type="text/javascript">
 var apinames_req='';  // this will contain fields which are visible as required on pagelayout
 var apinames = '';   // this will contain fields visible on pagelayout
-//Getting Fields Apiname on the basis of Pagelayout(using RecordType)
+//Getting Dynamic Fields Apiname on the basis of Pagelayout(using RecordType)
 function detailLayoutResults(result,Layoutname)
 {
     var allTheLayouts = result.getArray("layouts");     //adding fields and sections
