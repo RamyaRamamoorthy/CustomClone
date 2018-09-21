@@ -1,7 +1,7 @@
 /*
 Class name: CloneDynamicPage
 Referenced in vf page: CloneDynamicPage
-Purpose: Takes the record ID as a parameter and makes a clone , prepopulating the values from Custom metadata type records.
+Purpose: Takes the record ID as a parameter, dynamically grabs the page layout, makes a clone , prepopulating the values from Custom metadata type records.
 */
 Public with sharing class CloneDynamicPage
 {

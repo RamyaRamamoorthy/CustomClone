@@ -1,6 +1,6 @@
 <apex:page Controller="CloneDynamicPage"  sidebar="false" id="pageid" standardStylesheets="true" showHeader="true" lightningStylesheets="true">
     <apex:outputPanel id="msgPanel">
-    <apex:pageMessages />
+    <apex:pageMessages/>
     </apex:outputPanel>
 <script type="text/javascript">
 var __sfdcSessionId = '{!GETSESSIONID()}';
