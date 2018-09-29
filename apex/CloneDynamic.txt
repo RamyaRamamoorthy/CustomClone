@@ -1,7 +1,7 @@
 /*
 Class name: CloneDynamicPage
 Referenced in vf page: CloneDynamicPage
-Purpose: Takes the record ID as a parameter, dynamically grabs the page layout, makes a clone , prepopulating the values from Custom metadata type records.
+Purpose: Takes the record ID as a parameter and clones.
 */
 Public with sharing class CloneDynamicPage
 {
@@ -22,6 +22,7 @@ public Map<String, List<String>> sectionObjListMap { get; set;}
 private List<CloneGeneric__mdt> clolist = new List<CloneGeneric__mdt>();
 public Double askamt {get;set;}
 public id accid {get;set;}
+public id resid {get;set;}    
 public Boolean showclose {get;set;}    
 
 public CloneDynamicPage()
@@ -29,10 +30,13 @@ public CloneDynamicPage()
     //Initializing Variables
     id tempid=ApexPages.currentPage().getParameters().get('id');
     accid = ApexPages.currentPage().getParameters().get('accid');
+    resid = ApexPages.currentPage().getParameters().get('resid');
+    if (ApexPages.currentPage().getParameters().get('askamt') != null)
+    	askamt = Decimal.valueOf(ApexPages.currentPage().getParameters().get('askamt').replaceAll('[^.\\d]',''));
     recordId = tempid;
     objectselected = tempid.getSObjectType().getDescribe().getName();
     showclose = true;
-  if (objectselected == 'Opportunity')
+	if (objectselected == 'Opportunity')
         showclose = false;
     clolist = [select Field__c, Value__c FROM CloneGeneric__mdt where Object__c =:objectselected ];       
     sectionObjListMap = new Map<String, List<String>>(); // storing fields for each section
@@ -51,24 +55,22 @@ public void calledonload()
     List<String> displayFieldLst;
     System.debug('objectselected:'+objectselected);
     System.debug('rectypefld---->'+rectypefld); 
-    if (objectselected != 'Opportunity' && objectselected != 'Payment__c')
-      rectypefld = rectypefld.replaceFirst(',', ',Name,');
-    
-    //Name field is not automatically available in Dynamic loading.
-    //Examples of how you want to add Name field in the page layout , if your Name field is not the first field in pagelayout
-    if(objectselected == 'Opportunity')
+    if (objectselected != 'ts2__employment_history__c' && objectselected != 'Opportunity' && objectselected != 'Payment__c')
+    	rectypefld = rectypefld.replaceFirst(',', ',Name,');
+    if(objectselected == 'Opportunity') {
         rectypefld = rectypefld.replaceFirst(',StageName', ',Name,stagename');
+        rectypefld = rectypefld.replaceFirst('AccountId,', 'AccountId,Amount,');
+    }	
     if(objectselected == 'Payment__c')
-        rectypefld = rectypefld.replaceFirst(',Payment_GL_Post_Date__c', ',Name,Payment_GL_Post_Date__c');
+        rectypefld = rectypefld.replaceFirst(',Payment_GL_Post_Date__c', ',Name,Payment_GL_Post_Date__c'); 
     
     System.debug('rectypefld---->'+rectypefld); 
     List<string> reqfldlist_temp=rectypefld.split('%sr%');
     System.debug('Size---->'+reqfldlist_temp.size());
     if(reqfldlist_temp.size()!=1) // required field list
         reqfldlist=reqfldlist_temp[1].split(',');
-     //Examples of how you want to make Name field as Required in the page layout
-    if (objectselected != 'Payment__c') 
-      reqfldlist.add('Name');
+    if (objectselected != 'ts2__employment_history__c') 
+    	reqfldlist.add('Name');
     System.debug('reqfld is ' + reqfldlist);
 // section Item list
     if(reqfldlist_temp[0] != '' || reqfldlist_temp[0] != null)
@@ -117,11 +119,9 @@ public void calledonload()
                 }        
                 else
                 {
-                    if (!s.isCalculated()) {
                         dynamicSQL+=', ' + pcName; 
                         displayFieldMap.put(pcName,pcName);
                         displayFieldLst.add(pcName);
-                    }
                 }
             }
         } // end of outer if
@@ -131,7 +131,7 @@ public void calledonload()
     
     dynamicSQL+=' FROM '+objectselected +' where Id=:recordId';  
     //System.debug('objectfieldlist2: '+ objectfieldlist2.size());
-    System.debug('sectionList'+ sectionList.size() + sectionList);
+    System.debug('sectionList'+ sectionList.size() +'sravanthi list:'+ sectionList);
     sobjLst=Database.query(dynamicSQL); 
     
     overwrite();
@@ -145,7 +145,7 @@ public void calledonload()
       Component.Apex.OutputLabel label;
       Component.Apex.outputLink link = new Component.Apex.outputLink();
       Component.Apex.outputText txt = new Component.Apex.outputText(); 
-      Component.Apex.PageblockSectionItem pbsecItem = new Component.Apex.PageblockSectionItem(); 
+      Component.Apex.PageblockSectionItem pbsecItem;
       Component.Apex.inputField inputField;
       Component.Apex.outputField outputField;
       Component.Apex.PageblockSection pbsection;// = new Component.Apex.PageblockSection(columns=2, title=sectionList[0]);
@@ -160,9 +160,10 @@ public void calledonload()
      // pbsection = new Component.Apex.PageblockSection(columns=2, title=sectionList[j]); 
         displayFieldLst = sectionObjListMap.get(sectionList[j]);  
       //System.debug('<<<>>>>'+sectionList[j]);
-      
+
       for(Integer index=0;index<displayFieldLst.size();index++)  
       { 
+        Boolean addBlankField = false;
         System.debug('display is ' + displayFieldMap.get(displayFieldLst.get(index)));
         Schema.DescribeFieldResult s2 = fNameMap2.get(displayFieldLst.get(index)).getDescribe();
         if (displayFieldMap.get(displayFieldLst.get(index)) == 'RecordType.Name') {
@@ -177,6 +178,10 @@ public void calledonload()
             inputField.label=displayLabelMap.get(displayFieldLst.get(index));
             if (reqfldlist.contains(displayFieldLst.get(index)))
                 inputField.required = true;
+            if (displayFieldMap.get(displayFieldLst.get(index)) == 'ts2__employment_Start_Date__c' || displayFieldMap.get(displayFieldLst.get(index)) == 'ts2__Job_Title__c') {
+                System.debug('yes i am in start date');
+                addBlankField = true;
+            }
         }
         if(!ispbSectionCreated)
           {
@@ -184,7 +189,8 @@ public void calledonload()
             ispbSectionCreated = true;
             pb.childcomponents.add(pbsection);
             pbsection.childcomponents.add(inputField);
-            if(isoutputLink) { pbsection.childcomponents.add(pbsecItem); isoutputLink = false; }
+            System.debug(' i am in section created');
+            if(isoutputLink) {  pbsection.childcomponents.add(pbsecItem); isoutputLink = false; }
           } 
           else 
           {
@@ -194,8 +200,8 @@ public void calledonload()
                 isOutputField = false;
             }
             else 
-              pbsection.childcomponents.add(inputField);
-            if(isoutputLink) { pbsection.childcomponents.add(pbsecItem);  isoutputLink = false; }
+            	pbsection.childcomponents.add(inputField);
+            if(isoutputLink || addBlankField ) { pbsecItem = new Component.Apex.PageblockSectionItem();  System.debug('so i added a blocksectionitem');  pbsection.childcomponents.add(pbsecItem);  isoutputLink = false; addBlankField = false;}
           }
       }  // end of inner for - Interation through fields with in section
     } // end of outer for - iteration through sections
@@ -212,6 +218,7 @@ public void calledonload()
 public PageReference saveNew() {
     System.debug('Iam in savenew');
     newemp = sobjLst[0].clone(false);
+    System.debug('so newemp is ' + newemp);
     try { 
      insert newemp; 
     } catch(System.DMLException e) {
@@ -226,23 +233,25 @@ public PageReference saveNew() {
 
 public PageReference close() {
     System.debug('in close');
-    return (new PageReference ('/' + sobjLst[0].Id));
+    if (objectselected == 'Opportunity') 
+        return (new PageReference ('/' + resid));
+    else     
+        return (new PageReference ('/' + sobjLst[0].Id));
 }
-
-
-//For overwriting values in Custom metadata Types or handling custom paramters we pass on to this VF Page
+    
 public void overwrite() {
     for (CloneGeneric__mdt c : clolist) {
         System.debug('so fieldname is ' + sobjLst[0]);
-        //If you have Boolean values in your custom metadata type, but store it as String variable in custom metadata type
         if (c.Value__c == 'false') {
             System.debug('so i am inside false -- fieldname is ' + sobjLst[0]);
             sobjLst[0].put(c.Field__c, false);
         }
         else 
-          sobjLst[0].put(c.Field__c, c.Value__c);        
+        	sobjLst[0].put(c.Field__c, c.Value__c);        
     }   
-
+    System.debug('askamt is ' + askamt);
+    if (askamt != null)
+        sobjLst[0].put('Ask_Amount__c',askamt);
     if (accid != null)
         sobjLst[0].put('AccountId',accid);    
 }

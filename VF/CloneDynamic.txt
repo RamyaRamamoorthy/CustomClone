@@ -1,6 +1,6 @@
 <apex:page Controller="CloneDynamicPage"  sidebar="false" id="pageid" standardStylesheets="true" showHeader="true" lightningStylesheets="true">
     <apex:outputPanel id="msgPanel">
-    <apex:pageMessages/>
+    <apex:pageMessages />
     </apex:outputPanel>
 <script type="text/javascript">
 var __sfdcSessionId = '{!GETSESSIONID()}';
@@ -9,7 +9,7 @@ var __sfdcSessionId = '{!GETSESSIONID()}';
 <script type="text/javascript">
 var apinames_req='';  // this will contain fields which are visible as required on pagelayout
 var apinames = '';   // this will contain fields visible on pagelayout
-//Getting Dynamic Fields Apiname on the basis of Pagelayout(using RecordType)
+//Getting Fields Apiname on the basis of Pagelayout(using RecordType)
 function detailLayoutResults(result,Layoutname)
 {
     var allTheLayouts = result.getArray("layouts");     //adding fields and sections
@@ -73,7 +73,7 @@ function getfieldsonpagelayout()
         if (RecordTypeId != '' && RecordTypeId != null)
         result = sforce.connection.describeLayout(objectname, new Array(RecordTypeId));
         
-        detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
+        //detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
         detailLayoutResults(result,'detailLayoutSections');        // getting fields from Detaillayout
         apinames+='%sr%'+apinames_req;
         apinames=apinames.replace(',undefined','').replace('undefined,','');
@@ -83,7 +83,7 @@ function getfieldsonpagelayout()
     catch (error)
     {
         var  result = sforce.connection.describeLayout(objectname);
-        detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
+        //detailLayoutResults(result,'editLayoutSections');          // getting fields from Editlayout
         detailLayoutResults(result,'detailLayoutSections');        // getting fields from Detaillayout
         apinames+='%sr%'+apinames_req;
         apinames=apinames.replace(',undefined','').replace('undefined,','');
