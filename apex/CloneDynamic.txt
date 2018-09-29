@@ -236,7 +236,7 @@ public PageReference close() {
     if (objectselected == 'Opportunity') 
         return (new PageReference ('/' + resid));
     else     
-        return (new PageReference ('/' + sobjLst[0].Id));
+        return (new PageReference ('/' + sobjLst[0].Id)); 
 }
     
 public void overwrite() {

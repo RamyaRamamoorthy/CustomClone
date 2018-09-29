@@ -101,7 +101,7 @@ function getfieldsonpagelayout()
         <apex:commandButton value="Save" action="{!saveNew}" rerender="msgPanel"/>
         <apex:commandButton value="Cancel" action="{!close}" rendered="{!showclose}"/>
         </div>
-    </apex:outputpanel>
+    </apex:outputpanel> 
 
     <apex:actionStatus id="mystatus" startText="Loading... please wait..." stopText="" style="left: 100px;top: 50px;">
         <apex:facet name="start">&nbsp;&nbsp;Loading... please wait...
